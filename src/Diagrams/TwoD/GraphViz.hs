@@ -90,10 +90,12 @@ drawGraph
   -> Gr (AttributeNode v) (AttributeNode e)
   -> QDiagram b V2 Double m
 drawGraph drawV drawE gr
-  = mconcat (map (uncurry drawV) (M.assocs vmap))
-  <> undefined  -- XXX use drawE
+  = mconcat (map drawE' edges)
+ <> mconcat (map (uncurry drawV) (M.assocs vmap))
   where
     (vmap, edges) = getGraph gr
+    drawE' (v1,v2,e,p)
+      = drawE v1 (fromJust $ M.lookup v1 vmap) v2 (fromJust $ M.lookup v2 vmap) e p
 
 ------------------------------------------------
 
