@@ -36,6 +36,7 @@ import           Data.GraphViz.Commands.IO         (hGetDot)
 import           Data.GraphViz.Types.Generalised   (FromGeneralisedDot (..))
 
 import           Data.List                         (group, sort)
+import           Data.List.Split                   (chunksOf)
 import qualified Data.Map                          as M
 import           Data.Maybe                        (catMaybes, fromJust,
                                                     maybeToList)
@@ -69,15 +70,16 @@ getGraph gr = (vmap, edges)
     getPath attrs = case [ss | Pos (SplinePos ss) <- attrs] of
       [splines] -> mconcat . map getSpline $ splines
       _ -> mempty
-    getSpline (Spline { startPoint = s, endPoint = e, splinePoints = pts}) =
-      (pointToP2 (head pts') ~~ (pointToP2 (last pts')))
+    getSpline (Spline { startPoint = s, endPoint = e, splinePoints = pt1:pts}) = thePath
       where
-        pts' = maybeToList s ++ pts ++ maybeToList e
-        -- FIXME.  convert cubic B-spline to beziers.  See e.g.
-        -- https://www.researchgate.net/profile/Lucia_Romani/publication/220221926_The_conversion_matrix_between_uniform_B-spline_and_Be%27zier_representations/links/0c96051ab2a8958616000000.pdf
-        -- p. 72 of http://wtsim.googlecode.com/hg-history/c651377e3bb9a0da099e63043cdfa1f9d6140736/docs/Buchauswahl.pdf
+        ptGroups = chunksOf 3 (map pointToP2 pts)
+        fixedBeziers = zipWith mkBez (pointToP2 pt1 : map last ptGroups) ptGroups
+        mkBez x1 [c1,c2,x2] = FCubic x1 c1 c2 x2
+        thePath         = fromLocSegments . fixup . map fromFixedSeg $ fixedBeziers
+        fixup []        = [] `at` origin
+        fixup (b1:rest) = (unLoc b1 : map unLoc rest) `at` loc b1
 
--- | XXX
+-- | Convert a GraphViz point to a diagrams point.
 pointToP2 :: G.Point -> P2 Double
 pointToP2 (G.Point {xCoord = x, yCoord = y}) = x ^& y
 
