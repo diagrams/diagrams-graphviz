@@ -15,6 +15,12 @@
 -----------------------------------------------------------------------------
 
 module Diagrams.TwoD.GraphViz (
+    mkGraph
+  , layoutGraph
+  , layoutGraph'
+
+  , getGraph
+  , drawGraph
   ) where
 
 import           Diagrams.Prelude
@@ -35,7 +41,8 @@ import           Data.Maybe                        (catMaybes, fromJust,
                                                     maybeToList)
 import           Data.Tuple                        (swap)
 
--- | XXX
+-- | Construct a graph from a list of vertex labels (which must be unique) and
+--   a list of edges.  The result is suitable as input to 'layoutGraph'.
 mkGraph :: Ord v => [v] -> [(v,v,e)] -> Gr v e
 mkGraph vs es = G.mkGraph vpairs edges
   where
@@ -44,7 +51,9 @@ mkGraph vs es = G.mkGraph vpairs edges
     edges  = catMaybes $ map mkEdge es
     mkEdge (v1,v2,e) = (,,) <$> M.lookup v1 vmap <*> M.lookup v2 vmap <*> pure e
 
--- | XXX
+-- | Decompose an annotated, concretely laid-out graph into a map from vertex labels to
+--   points and a collection of edges associating vertex and edge
+--   labels to 'Path' values.
 getGraph
   :: Ord v
   => Gr (AttributeNode v) (AttributeNode e)
@@ -72,52 +81,27 @@ getGraph gr = (vmap, edges)
 pointToP2 :: G.Point -> P2 Double
 pointToP2 (G.Point {xCoord = x, yCoord = y}) = x ^& y
 
--- | XXX
+-- | Render an annotated graph as a diagram, given functions
+-- controlling the drawing of vertices and of edges.
 drawGraph
   :: (Ord v, Semigroup m)
   => (v -> P2 Double -> QDiagram b V2 Double m)
-  -> (v -> v -> e -> Path V2 Double -> QDiagram b V2 Double m -> QDiagram b V2 Double m)
+  -> (v -> P2 Double -> v -> P2 Double -> e -> Path V2 Double -> QDiagram b V2 Double m)
   -> Gr (AttributeNode v) (AttributeNode e)
   -> QDiagram b V2 Double m
 drawGraph drawV drawE gr
   = mconcat (map (uncurry drawV) (M.assocs vmap))
-  # applyAll (map drawE' edges)
+  <> undefined  -- XXX use drawE
   where
     (vmap, edges) = getGraph gr
-    drawE' (v1,v2,e,p) = drawE v1 v2 e p
-
--- graphToDia
---   :: ((Int,(Attributes, nl)) -> QDiagram b V2 n m)
---   -> ((Int, Int, (Attributes, el)) -> QDiagram b V2 n m -> QDiagram b V2 n m)
---   -> Gr (AttributeNode nl) (AttributeNode el) -> Diagram B R2
--- graphToDia dn de gr = drawNodes # drawEdges
---   where
---     nodes = labNodes gr
---     edges = labEdges gr
---     drawNodes = mconcat . map drawNode $ nodes
---     drawEdges = applyAll . map drawEdge $ edges
---     drawNode nd@(n,(attrs,_)) =
---       case [p | Pos (PointPos p) <- attrs] of
---         [] -> mempty
---         [pt] -> dn nd # named n # moveTo (pointToP2 pt)
---         -- it's actually using ellipses by default.  Need to set input shape?
---     drawEdge (n1,n2,_) = de n1 n2
---     --   case [ss | Pos (SplinePos ss) <- attrs] of
---     --     [] -> mempty
---     --     [splines] -> mconcat . map drawSpline $ splines
---     -- drawSpline (Spline { startPoint = s, endPoint = e, splinePoints = pts}) =
---     --   (pointToP2 (head pts') ~~ (pointToP2 (last pts'))) -- FIXME.
---     --                                                      -- should be
---     --                                                      -- cubic
---     --                                                      -- B-spline.
---     --   where
---     --     pts' = maybeToList s ++ pts ++ maybeToList e
-
---
 
 ------------------------------------------------
 
--- | XXX
+-- | Round-trip a graph through the external graphviz command, and
+--   read back in a version annotated with explicit positioning
+--   information.  The result is suitable for input to 'drawGraph' or,
+--   more directly, to 'getGraph'.  XXX 'GraphvizCommand'.  For more
+--   control over the functioning of graphviz, see 'layoutGraph''.
 layoutGraph
   :: forall gr v e. G.Graph gr
   => GraphvizCommand
@@ -125,7 +109,9 @@ layoutGraph
   -> IO (gr (AttributeNode v) (AttributeEdge e))
 layoutGraph = layoutGraph' (defaultParams :: GraphvizParams G.Node v e () v)
 
--- | XXX
+-- | Like 'layoutGraph', but with an extra 'GraphvizParams' parameter
+--   controlling various aspects of the graphviz layout process.  XXX
+--   more info.  Try it.
 layoutGraph'
   :: (Ord cl, G.Graph gr)
   => GraphvizParams G.Node v e cl l
@@ -138,7 +124,9 @@ layoutGraph' params com gr = dotAttributes' com (isDirected params) gr' dot
     params' = params { fmtEdge = setEdgeIDAttribute $ fmtEdge params }
     gr' = addEdgeIDs gr
 
--- XXX Write a comment here
+-- This should not be exported.  It is more or less copied from the
+-- graphviz package source; the problem is that graphviz does not
+-- export any way to have this parameterized by the GraphvizCommand.
 dotAttributes' :: (G.Graph gr, PPDotRepr dg G.Node, FromGeneralisedDot dg G.Node)
                   => GraphvizCommand -> Bool -> gr v (EdgeID e)
                   -> dg G.Node -> IO (gr (AttributeNode v) (AttributeEdge e))
