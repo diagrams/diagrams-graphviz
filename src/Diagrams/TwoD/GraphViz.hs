@@ -18,6 +18,7 @@ module Diagrams.TwoD.GraphViz (
     mkGraph
   , layoutGraph
   , layoutGraph'
+  , defaultDiaParams
 
   , getGraph
   , drawGraph
@@ -111,7 +112,7 @@ layoutGraph
   => GraphvizCommand
   -> gr v e
   -> IO (gr (AttributeNode v) (AttributeEdge e))
-layoutGraph = layoutGraph' (defaultParams :: GraphvizParams G.Node v e () v)
+layoutGraph = layoutGraph' (defaultDiaParams :: GraphvizParams G.Node v e () v)
 
 -- | Like 'layoutGraph', but with an extra 'GraphvizParams' parameter
 --   controlling various aspects of the graphviz layout process.  XXX
@@ -127,6 +128,19 @@ layoutGraph' params com gr = dotAttributes' com (isDirected params) gr' dot
     dot = graphToDot params' gr'
     params' = params { fmtEdge = setEdgeIDAttribute $ fmtEdge params }
     gr' = addEdgeIDs gr
+
+-- | Some convenient parameters for GraphViz which work better for
+--   diagrams than the default.  In particular, use circular nodes
+--   (instead of the default ovals), and allow cubic splines for
+--   edges.
+defaultDiaParams :: GraphvizParams G.Node v e cl v
+defaultDiaParams
+  = defaultParams
+    { globalAttributes =
+      [ NodeAttrs [shape Circle]
+      , GraphAttrs [Overlap ScaleOverlaps, Splines SplineEdges]
+      ]
+    }
 
 -- This should not be exported.  It is more or less copied from the
 -- graphviz package source; the problem is that graphviz does not
