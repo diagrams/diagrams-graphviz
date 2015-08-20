@@ -10,8 +10,84 @@
 -- License     :  BSD-style (see LICENSE)
 -- Maintainer  :  byorgey@gmail.com
 --
--- XXX
+-- A simple module with some "glue code" necessary for using diagrams
+-- and GraphViz (<http://www.graphviz.org/>) in conjunction.  GraphViz
+-- is great at laying out graphs but terrible at drawing them, so why
+-- not let GraphViz do what it is good at, and use a dedicated drawing
+-- library for the actual drawing?
 --
+-- Here is some example code to lay out and draw a simple directed
+-- graph hierarchically:
+--
+-- > {-# LANGUAGE NoMonomorphismRestriction #-}
+-- >
+-- > import           Diagrams.Backend.Rasterific.CmdLine
+-- > import           Diagrams.Prelude
+-- > import           Diagrams.TwoD.GraphViz
+-- >
+-- > import           Data.GraphViz
+-- > import           Data.GraphViz.Commands
+-- >
+-- > hex = mkGraph [0..19]
+-- >         (   [ (v, (v+1)`mod`6, ()) | v <- [0..5] ]
+-- >          ++ [ (v, v+k, ()) | v <- [0..5], k <- [6,12] ]
+-- >          ++ [ (2,18,()), (2,19,()), (15,18,()), (15,19,()), (18,3,()), (19,3,()) ]
+-- >         )
+-- >
+-- > graphvizExample1 = do
+-- >   hex' <- layoutGraph Dot hex
+-- >   let hexDrawing :: Diagram B
+-- >       hexDrawing = drawGraph
+-- >                      (const $ place (circle 19))
+-- >                      (\_ p1 _ p2 _ p -> arrowBetween' (opts p) p1 p2)
+-- >                      hex'
+-- >       opts p = with & gaps .~ 16 & arrowShaft .~ (unLoc . head $ pathTrails p)
+-- >   return (hexDrawing # frame 1)
+--
+-- There are a few quirks to note.
+--
+--   * GraphViz seems to assume the circular nodes have radius 19.
+--
+--   * Note how we draw an arrow for each edge, and use the path
+--     computed by GraphViz (which might be curved) to specify the shaft
+--     for the arrow.
+--
+-- Here is a slightly modified example, which tells GraphViz not to
+-- use any arrowheads on the edges:
+--
+-- > {-# LANGUAGE NoMonomorphismRestriction #-}
+-- >
+-- > import           Diagrams.Backend.Rasterific.CmdLine
+-- > import           Diagrams.Prelude
+-- > import           Diagrams.TwoD.GraphViz
+-- >
+-- > import           Data.GraphViz
+-- > import           Data.GraphViz.Attributes.Complete
+-- > import           Data.GraphViz.Commands
+-- >
+-- > hex = mkGraph [0..19]
+-- >         (   [ (v, (v+1)`mod`6, ()) | v <- [0..5] ]
+-- >          ++ [ (v, v+k, ()) | v <- [0..5], k <- [6,12] ]
+-- >          ++ [ (2,18,()), (2,19,()), (15,18,()), (15,19,()), (18,3,()), (19,3,()) ]
+-- >         )
+-- >
+-- > main = do
+-- >   let params :: GraphvizParams Int v e () v
+-- >       params = defaultDiaParams
+-- >                { fmtEdge = const [arrowTo noArrow] }
+-- >   hex' <- layoutGraph' params Dot hex
+-- >   let hexDrawing :: Diagram B
+-- >       hexDrawing = drawGraph
+-- >                      (const $ place (circle 19))
+-- >                      (\_ _ _ _ _ p -> stroke p)
+-- >                      hex'
+-- >   mainWith $ hexDrawing # frame 1
+--
+--   * The type signature on @params@ is unfortunately necessary;
+--     otherwise some ambiguity errors arise.
+--
+--   * Note how in this simple case we can just draw the path
+--     for each edge directly.
 -----------------------------------------------------------------------------
 
 module Diagrams.TwoD.GraphViz (
@@ -20,8 +96,8 @@ module Diagrams.TwoD.GraphViz (
   , layoutGraph'
   , defaultDiaParams
 
-  , getGraph
   , drawGraph
+  , getGraph
   ) where
 
 import           Diagrams.Prelude
@@ -30,7 +106,8 @@ import qualified Data.Graph.Inductive.Graph        as G (Graph, Node, labEdges,
                                                          labNodes, mkGraph)
 import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Data.GraphViz                     hiding (Path)
-import           Data.GraphViz.Attributes.Complete as G (Attribute (Pos),
+import           Data.GraphViz.Attributes.Complete as G (Attribute (Pos, Overlap, Splines),
+                                                         EdgeType (SplineEdges), Overlap (ScaleOverlaps),
                                                          Point (..), Pos (..),
                                                          Spline (..))
 import           Data.GraphViz.Commands.IO         (hGetDot)
@@ -44,7 +121,7 @@ import           Data.Maybe                        (catMaybes, fromJust,
 import           Data.Tuple                        (swap)
 
 -- | Construct a graph from a list of vertex labels (which must be unique) and
---   a list of edges.  The result is suitable as input to 'layoutGraph'.
+--   a list of (directed) edges.  The result is suitable as input to 'layoutGraph'.
 mkGraph :: Ord v => [v] -> [(v,v,e)] -> Gr v e
 mkGraph vs es = G.mkGraph vpairs edges
   where
@@ -55,7 +132,9 @@ mkGraph vs es = G.mkGraph vpairs edges
 
 -- | Decompose an annotated, concretely laid-out graph into a map from vertex labels to
 --   points and a collection of edges associating vertex and edge
---   labels to 'Path' values.
+--   labels to 'Path' values.  This is used internally by 'drawGraph',
+--   but exported since it may also be useful for more fine-grained
+--   control over graph drawing.
 getGraph
   :: Ord v
   => Gr (AttributeNode v) (AttributeNode e)
@@ -85,7 +164,11 @@ pointToP2 :: G.Point -> P2 Double
 pointToP2 (G.Point {xCoord = x, yCoord = y}) = x ^& y
 
 -- | Render an annotated graph as a diagram, given functions
--- controlling the drawing of vertices and of edges.
+--   controlling the drawing of vertices and of edges.  The first
+--   function is given the label and location of each vertex. The
+--   second function, for each edge, is given the label and location
+--   of the first vertex, the label and location of the second vertex,
+--   and the label and path corresponding to the edge.
 drawGraph
   :: (Ord v, Semigroup m)
   => (v -> P2 Double -> QDiagram b V2 Double m)
@@ -100,13 +183,13 @@ drawGraph drawV drawE gr
     drawE' (v1,v2,e,p)
       = drawE v1 (fromJust $ M.lookup v1 vmap) v2 (fromJust $ M.lookup v2 vmap) e p
 
-------------------------------------------------
-
--- | Round-trip a graph through the external graphviz command, and
+-- | Round-trip a graph through an external graphviz layout algorithm, and
 --   read back in a version annotated with explicit positioning
 --   information.  The result is suitable for input to 'drawGraph' or,
---   more directly, to 'getGraph'.  XXX 'GraphvizCommand'.  For more
---   control over the functioning of graphviz, see 'layoutGraph''.
+--   more directly, to 'getGraph'.  The 'GraphvizCommand' should be
+--   something like @Dot@ or @Neato@; to access them you should import
+--   "Data.GraphViz.Command".  For more control over the functioning
+--   of graphviz, see 'layoutGraph''.
 layoutGraph
   :: forall gr v e. G.Graph gr
   => GraphvizCommand
@@ -115,8 +198,9 @@ layoutGraph
 layoutGraph = layoutGraph' (defaultDiaParams :: GraphvizParams G.Node v e () v)
 
 -- | Like 'layoutGraph', but with an extra 'GraphvizParams' parameter
---   controlling various aspects of the graphviz layout process.  XXX
---   more info.  Try it.
+--   controlling various aspects of the graphviz layout process.  See
+--   'defaultDiaParams', and the "Data.GraphViz.Attributes" and
+--   "Data.GraphViz.Attributes.Complete" modules.
 layoutGraph'
   :: (Ord cl, G.Graph gr)
   => GraphvizParams G.Node v e cl l
