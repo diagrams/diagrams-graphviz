@@ -14,6 +14,10 @@ category:            Graphics
 build-type:          Simple
 extra-source-files:  README.markdown, CHANGES.markdown
 cabal-version:       >=1.10
+Tested-with:         GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.3, GHC == 8.0.1
+Source-repository head
+  type:     git
+  location: git://github.com/diagrams/diagrams-graphviz.git
 
 library
   exposed-modules:     Diagrams.TwoD.GraphViz
