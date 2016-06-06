@@ -155,9 +155,12 @@ getGraph gr = (vmap, edges)
         ptGroups = chunksOf 3 (map pointToP2 pts)
         fixedBeziers = zipWith mkBez (pointToP2 pt1 : map last ptGroups) ptGroups
         mkBez x1 [c1,c2,x2] = FCubic x1 c1 c2 x2
+        mkBez _ _ = error "Diagrams.TwoD.GraphViz.getGraph.mkBez: impossible!"
         thePath         = fromLocSegments . fixup . map fromFixedSeg $ fixedBeziers
         fixup []        = [] `at` origin
         fixup (b1:rest) = (unLoc b1 : map unLoc rest) `at` loc b1
+    getSpline _ = error "Diagrams.TwoD.GraphViz.getGraph: don't know what to do with empty spline!"
+
 
 -- | Convert a GraphViz point to a diagrams point.
 pointToP2 :: G.Point -> P2 Double
