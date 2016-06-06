@@ -106,7 +106,7 @@ import           Diagrams.Prelude
 import qualified Data.Graph.Inductive.Graph        as G (Graph, Node, labEdges,
                                                          labNodes, mkGraph)
 import           Data.Graph.Inductive.PatriciaTree (Gr)
-import           Data.GraphViz                     hiding (Path)
+import           Data.GraphViz                     hiding (Path, attrs)
 import           Data.GraphViz.Attributes.Complete as G (Attribute (Pos, Overlap, Splines),
                                                          EdgeType (SplineEdges), Overlap (ScaleOverlaps),
                                                          Point (..), Pos (..),
@@ -117,8 +117,7 @@ import           Data.GraphViz.Types.Generalised   (FromGeneralisedDot (..))
 import           Data.List                         (group, sort)
 import           Data.List.Split                   (chunksOf)
 import qualified Data.Map                          as M
-import           Data.Maybe                        (catMaybes, fromJust,
-                                                    maybeToList)
+import           Data.Maybe                        (catMaybes, fromJust)
 import           Data.Tuple                        (swap)
 
 -- | Construct a graph from a list of vertex labels (which must be unique) and
@@ -151,7 +150,7 @@ getGraph gr = (vmap, edges)
     getPath attrs = case [ss | Pos (SplinePos ss) <- attrs] of
       [splines] -> mconcat . map getSpline $ splines
       _ -> mempty
-    getSpline (Spline { startPoint = s, endPoint = e, splinePoints = pt1:pts}) = thePath
+    getSpline (Spline { splinePoints = pt1:pts}) = thePath
       where
         ptGroups = chunksOf 3 (map pointToP2 pts)
         fixedBeziers = zipWith mkBez (pointToP2 pt1 : map last ptGroups) ptGroups
@@ -208,9 +207,9 @@ layoutGraph'
   -> GraphvizCommand
   -> gr v e
   -> IO (gr (AttributeNode v) (AttributeEdge e))
-layoutGraph' params com gr = dotAttributes' com (isDirected params) gr' dot
+layoutGraph' params com gr = dotAttributes' com (isDirected params) gr' asDot
   where
-    dot = graphToDot params' gr'
+    asDot = graphToDot params' gr'
     params' = params { fmtEdge = setEdgeIDAttribute $ fmtEdge params }
     gr' = addEdgeIDs gr
 
@@ -233,7 +232,7 @@ defaultDiaParams
 dotAttributes' :: (G.Graph gr, PPDotRepr dg G.Node, FromGeneralisedDot dg G.Node)
                   => GraphvizCommand -> Bool -> gr v (EdgeID e)
                   -> dg G.Node -> IO (gr (AttributeNode v) (AttributeEdge e))
-dotAttributes' command isDir gr dot
-  = augmentGraph gr . parseDG <$> graphvizWithHandle command dot DotOutput hGetDot
+dotAttributes' command _isDir gr asDot
+  = augmentGraph gr . parseDG <$> graphvizWithHandle command asDot DotOutput hGetDot
   where
-    parseDG = (`asTypeOf` dot) . fromGeneralised
+    parseDG = (`asTypeOf` asDot) . fromGeneralised
