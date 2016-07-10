@@ -99,6 +99,7 @@ module Diagrams.TwoD.GraphViz (
 
   , drawGraph
   , getGraph
+  , simpleGraphDiagram
   ) where
 
 import           Diagrams.Prelude
@@ -239,3 +240,26 @@ dotAttributes' command _isDir gr asDot
   = augmentGraph gr . parseDG <$> graphvizWithHandle command asDot DotOutput hGetDot
   where
     parseDG = (`asTypeOf` asDot) . fromGeneralised
+
+
+-- | Just draw the nodes of the graph as circles and the edges as
+--   arrows between them.
+simpleGraphDiagram :: (Ord v, Renderable (Path V2 Double) b)
+     => GraphvizCommand -> Gr v e -> IO (QDiagram b V2 Double Any)
+simpleGraphDiagram layoutCmd gr = do
+  gr' <- layoutGraph layoutCmd gr
+  let nodes = G.labNodes gr'
+      vmap = M.fromList [ (i, pointToP2 pt)
+                        | (i,(attrs,_)) <- nodes, Pos (PointPos pt) <- attrs ]
+      edgeLengths = [ (fromJust $ M.lookup i vmap) `distance` (fromJust $ M.lookup j vmap)
+                    | (i, j, _) <- G.labEdges gr'
+                    ]
+      radius = minimum edgeLengths / 4
+      drawing = drawGraph
+                     (const $ place (circle radius))
+                     (\_ p1 _ p2 _ p -> arrowBetween' (opts p) p1 p2)
+                     gr'
+      opts p = with & gaps .~ local radius
+                    & arrowShaft .~ (unLoc . head $ pathTrails p)
+                    & headLength .~ local radius
+  return drawing
