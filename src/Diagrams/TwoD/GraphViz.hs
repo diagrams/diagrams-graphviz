@@ -17,8 +17,30 @@
 -- not let GraphViz do what it is good at, and use a dedicated drawing
 -- library for the actual drawing?
 --
--- Here is some example code to lay out and draw a simple directed
--- graph hierarchically:
+-- In all the following examples we will make use of this example graph:
+--
+-- > hex = mkGraph [0..19]
+-- >         (   [ (v, (v+1)`mod`6, ()) | v <- [0..5] ]
+-- >          ++ [ (v, v+k, ()) | v <- [0..5], k <- [6,12] ]
+-- >          ++ [ (2,18,()), (2,19,()), (15,18,()), (15,19,()), (18,3,()), (19,3,()) ]
+-- >         )
+--
+-- The easiest thing to do is to just use the provided
+-- 'simpleGraphDiagram' function to create a default diagram quickly:
+--
+-- > {-# LANGUAGE NoMonomorphismRestriction #-}
+-- >
+-- > import           Diagrams.Backend.Rasterific.CmdLine
+-- > import           Diagrams.Prelude
+-- > import           Diagrams.TwoD.GraphViz
+-- >
+-- > main = theGraph >>= defaultMain
+-- >   where
+-- >     theGraph :: IO (Diagram B)
+-- >     theGraph = simpleGraphDiagram Dot hex
+--
+-- Here is how we would produce a similar image, but with more control
+-- over the specific ways that things are drawn:
 --
 -- > {-# LANGUAGE NoMonomorphismRestriction #-}
 -- >
@@ -28,12 +50,6 @@
 -- >
 -- > import           Data.GraphViz
 -- > import           Data.GraphViz.Commands
--- >
--- > hex = mkGraph [0..19]
--- >         (   [ (v, (v+1)`mod`6, ()) | v <- [0..5] ]
--- >          ++ [ (v, v+k, ()) | v <- [0..5], k <- [6,12] ]
--- >          ++ [ (2,18,()), (2,19,()), (15,18,()), (15,19,()), (18,3,()), (19,3,()) ]
--- >         )
 -- >
 -- > graphvizExample1 = do
 -- >   hex' <- layoutGraph Dot hex
@@ -65,12 +81,6 @@
 -- > import           Data.GraphViz
 -- > import           Data.GraphViz.Attributes.Complete
 -- > import           Data.GraphViz.Commands
--- >
--- > hex = mkGraph [0..19]
--- >         (   [ (v, (v+1)`mod`6, ()) | v <- [0..5] ]
--- >          ++ [ (v, v+k, ()) | v <- [0..5], k <- [6,12] ]
--- >          ++ [ (2,18,()), (2,19,()), (15,18,()), (15,19,()), (18,3,()), (19,3,()) ]
--- >         )
 -- >
 -- > main = do
 -- >   let params :: GraphvizParams Int v e () v
