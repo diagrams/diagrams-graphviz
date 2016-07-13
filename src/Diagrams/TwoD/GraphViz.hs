@@ -254,12 +254,12 @@ simpleGraphDiagram layoutCmd gr = do
       edgeLengths = [ (fromJust $ M.lookup i vmap) `distance` (fromJust $ M.lookup j vmap)
                     | (i, j, _) <- G.labEdges gr'
                     ]
-      radius = minimum edgeLengths / 4
+      nodeRadius = minimum edgeLengths / 4
       drawing = drawGraph
-                     (const $ place (circle radius))
-                     (\_ p1 _ p2 _ p -> arrowBetween' (opts p) p1 p2)
+                     (const $ place (circle nodeRadius))
+                     (\_ p₁ _ p₂ _ p -> arrowBetween' (opts p) p₁ p₂)
                      gr'
-      opts p = with & gaps .~ local radius
+      opts p = with & gaps .~ local nodeRadius
                     & arrowShaft .~ (unLoc . head $ pathTrails p)
-                    & headLength .~ local radius
+                    & headLength .~ local nodeRadius
   return drawing
