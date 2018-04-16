@@ -102,7 +102,8 @@
 -----------------------------------------------------------------------------
 
 module Diagrams.TwoD.GraphViz (
-    mkGraph
+    GraphLayering (..)
+  , mkGraph
   , layoutGraph
   , layoutGraph'
   , defaultDiaParams
@@ -215,8 +216,8 @@ drawGraph' gl drawV drawE gr
       VerticesOnTop -> mconcat (reverse components)
   where
     components =
-      [ mconcat (map (uncurry drawV) (M.assocs vmap))
-      , mconcat (map drawE' edges)
+      [ mconcat (map drawE' edges)
+      , mconcat (map (uncurry drawV) (M.assocs vmap))
       ]
     (vmap, edges) = getGraph gr
     drawE' (v1,v2,e,p)
