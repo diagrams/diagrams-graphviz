@@ -102,7 +102,8 @@
 -----------------------------------------------------------------------------
 
 module Diagrams.TwoD.GraphViz (
-    mkGraph
+    GraphLayering (..)
+  , mkGraph
   , layoutGraph
   , layoutGraph'
   , defaultDiaParams
@@ -184,37 +185,40 @@ pointToP2 (G.Point {xCoord = x, yCoord = y}) = x ^& y
 --   second function, for each edge, is given the label and location
 --   of the first vertex, the label and location of the second vertex,
 --   and the label and path corresponding to the edge.
+--
+--   Note that, by default, edges are drawn on top of vertices.  To
+--   control the placement order, use 'drawGraph''.
 drawGraph
   :: (Ord v, Semigroup m)
   => (v -> P2 Double -> QDiagram b V2 Double m)
   -> (v -> P2 Double -> v -> P2 Double -> e -> Path V2 Double -> QDiagram b V2 Double m)
   -> Gr (AttributeNode v) (AttributeEdge e)
   -> QDiagram b V2 Double m
-drawGraph drawV drawE gr
-  = mconcat (map drawE' edges)
- <> mconcat (map (uncurry drawV) (M.assocs vmap))
-  where
-    (vmap, edges) = getGraph gr
-    drawE' (v1,v2,e,p)
-      = drawE v1 (fromJust $ M.lookup v1 vmap) v2 (fromJust $ M.lookup v2 vmap) e p
+drawGraph = drawGraph' EdgesOnTop
 
--- | Same as 'drawGraph' but draw vertices over edges.
---   Render an annotated graph as a diagram, given functions
---   controlling the drawing of vertices and of edges.  The first
---   function is given the label and location of each vertex. The
---   second function, for each edge, is given the label and location
---   of the first vertex, the label and location of the second vertex,
---   and the label and path corresponding to the edge.
+-- | A data type for specifying whether edges should be drawn on top
+--   of vertices or vice versa.
+data GraphLayering = EdgesOnTop | VerticesOnTop
+  deriving (Show, Read, Eq, Ord)
+
+-- | The same as 'drawGraph', but with an extra parameter allowing you
+--   to specify whether vertices or edges should be drawn on top.
 drawGraph'
   :: (Ord v, Semigroup m)
-  => (v -> P2 Double -> QDiagram b V2 Double m)
+  => GraphLayering
+  -> (v -> P2 Double -> QDiagram b V2 Double m)
   -> (v -> P2 Double -> v -> P2 Double -> e -> Path V2 Double -> QDiagram b V2 Double m)
   -> Gr (AttributeNode v) (AttributeEdge e)
   -> QDiagram b V2 Double m
-drawGraph' drawV drawE gr
-  = mconcat (map (uncurry drawV) (M.assocs vmap))
- <> mconcat (map drawE' edges)
+drawGraph' gl drawV drawE gr
+  = case gl of
+      EdgesOnTop    -> mconcat components
+      VerticesOnTop -> mconcat (reverse components)
   where
+    components =
+      [ mconcat (map drawE' edges)
+      , mconcat (map (uncurry drawV) (M.assocs vmap))
+      ]
     (vmap, edges) = getGraph gr
     drawE' (v1,v2,e,p)
       = drawE v1 (fromJust $ M.lookup v1 vmap) v2 (fromJust $ M.lookup v2 vmap) e p
