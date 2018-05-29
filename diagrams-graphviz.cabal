@@ -1,5 +1,5 @@
 name:                diagrams-graphviz
-version:             1.4
+version:             1.4.1
 synopsis:            Graph layout and drawing with GrahpViz and diagrams
 description:         Use GraphViz and diagrams together, with each doing what
                      it does best: GraphViz for laying out graphs, and diagrams
