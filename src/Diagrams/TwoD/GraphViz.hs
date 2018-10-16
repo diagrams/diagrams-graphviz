@@ -112,16 +112,17 @@ module Diagrams.TwoD.GraphViz (
   , simpleGraphDiagram
   ) where
 
-import System.IO.Unsafe
-import           Diagrams.Prelude
-import Geometry hiding (mkGraph)
+import           Diagrams.Prelude                  hiding (mkGraph)
+import           Geometry                          hiding (mkGraph)
+import           System.IO.Unsafe
 
 import qualified Data.Graph.Inductive.Graph        as G (Graph, Node, labEdges,
                                                          labNodes, mkGraph)
 import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Data.GraphViz                     hiding (Path, attrs)
-import           Data.GraphViz.Attributes.Complete as G (Attribute (Pos, Overlap, Splines),
-                                                         EdgeType (SplineEdges), Overlap (ScaleOverlaps),
+import           Data.GraphViz.Attributes.Complete as G (Attribute (Overlap, Pos, Splines),
+                                                         EdgeType (SplineEdges),
+                                                         Overlap (ScaleOverlaps),
                                                          Point (..), Pos (..),
                                                          Spline (..))
 import           Data.GraphViz.Commands.IO         (hGetDot)
@@ -133,7 +134,7 @@ import qualified Data.Map                          as M
 import           Data.Maybe                        (catMaybes, fromJust)
 import           Data.Tuple                        (swap)
 
-import Debug.Trace
+import           Debug.Trace
 
 -- | Construct a graph from a list of vertex labels (which must be unique) and
 --   a list of (directed) edges.  The result is suitable as input to 'layoutGraph'.

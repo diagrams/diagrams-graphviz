@@ -27,7 +27,7 @@ library
     containers >= 0.4 && < 0.6,
     diagrams >= 2.0,
     geometry,
-    graphviz >= 2999.17 && < 2999.20,
+    graphviz >= 2999.17 && < 2999.21,
     fgl >= 5.5 && < 5.7,
     diagrams-pgf,
     split >= 0.2 && < 0.3
