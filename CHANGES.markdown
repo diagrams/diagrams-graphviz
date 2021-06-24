@@ -4,6 +4,10 @@
 - allow `base-4.13`, `fgl-5.7`, and `containers-0.6`.
 - Test on GHC 8.6 and 8.8.
 
+- r1 (24 June 2021):
+    - allow `base-4.14` and `base-4.15`
+    - Test on GHC 8.10 and 9.0/
+
 1.4.1 (28 May 2018)
 -------------------
 
