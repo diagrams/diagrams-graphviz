@@ -6,7 +6,10 @@
 
 - r1 (24 June 2021):
     - allow `base-4.14` and `base-4.15`
-    - Test on GHC 8.10 and 9.0/
+    - Test on GHC 8.10 and 9.0
+- r3 (2 Oct 2022):
+    - allow `base-4.16` and `fgl-5.8`
+    - test up to GHC 9.4
 
 1.4.1 (28 May 2018)
 -------------------
