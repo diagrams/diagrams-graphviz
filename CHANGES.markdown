@@ -12,6 +12,8 @@
     - test up to GHC 9.4
 - r4 (10 July 2023):
     - allow `base-4.18` and test on GHC 9.6
+- r5 (26 January 2024):
+    - allow `base-4.19` and test on GHC 9.8
 
 1.4.1 (28 May 2018)
 -------------------
