@@ -17,7 +17,7 @@ cabal-version:       >=1.10
 Tested-with:         GHC ==8.4.4 || ==8.6.5 || ==8.8.4 || ==8.10.7 || ==9.0.2 || ==9.2.8 || ==9.4.8 || ==9.6.5 || ==9.8.2 || ==9.10.1 || ==9.12.1
 Source-repository head
   type:     git
-  location: git://github.com/diagrams/diagrams-graphviz.git
+  location: http://github.com/diagrams/diagrams-graphviz.git
 
 library
   exposed-modules:     Diagrams.TwoD.GraphViz
