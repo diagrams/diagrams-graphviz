@@ -16,6 +16,8 @@
     - allow `base-4.19` and test on GHC 9.8
 - r6 (14 Sep 2024):
     - allow `base-4.20`, `containers-0.7`, and test on GHC 9.10
+- r7 (18 Apr 2025):
+    - allow `base-4.21`, `diagrams-lib-1.5`, test on GHC 9.12
 
 1.4.1 (28 May 2018)
 -------------------
