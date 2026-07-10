@@ -114,14 +114,17 @@ module Diagrams.TwoD.GraphViz (
   , simpleGraphDiagram
   ) where
 
-import           Diagrams.Prelude
+import           Diagrams.Prelude                  hiding (mkGraph)
+import           Geometry                          hiding (mkGraph)
+import           System.IO.Unsafe
 
 import qualified Data.Graph.Inductive.Graph        as G (Graph, Node, labEdges,
                                                          labNodes, mkGraph)
 import           Data.Graph.Inductive.PatriciaTree (Gr)
 import           Data.GraphViz                     hiding (Path, attrs)
-import           Data.GraphViz.Attributes.Complete as G (Attribute (Pos, Overlap, Splines),
-                                                         EdgeType (SplineEdges), Overlap (ScaleOverlaps),
+import           Data.GraphViz.Attributes.Complete as G (Attribute (Overlap, Pos, Splines),
+                                                         EdgeType (SplineEdges),
+                                                         Overlap (ScaleOverlaps),
                                                          Point (..), Pos (..),
                                                          Spline (..))
 import           Data.GraphViz.Commands.IO         (hGetDot)
@@ -132,6 +135,8 @@ import           Data.List.Split                   (chunksOf)
 import qualified Data.Map                          as M
 import           Data.Maybe                        (catMaybes, fromJust)
 import           Data.Tuple                        (swap)
+
+import           Debug.Trace
 
 -- | Construct a graph from a list of vertex labels (which must be unique) and
 --   a list of (directed) edges.  The result is suitable as input to 'layoutGraph'.
@@ -150,7 +155,7 @@ mkGraph vs es = G.mkGraph vpairs edges
 --   control over graph drawing.
 getGraph
   :: Ord v
-  => Gr (AttributeNode v) (AttributeEdge e)
+  => Gr ([Attribute], v) ([Attribute], e)
   -> (M.Map v (P2 Double), [(v, v, e, Path V2 Double)])
 getGraph gr = (vmap, edges)
   where
@@ -162,14 +167,14 @@ getGraph gr = (vmap, edges)
             ]
     getPath attrs = case [ss | Pos (SplinePos ss) <- attrs] of
       [splines] -> mconcat . map getSpline $ splines
-      _ -> mempty
+      _ -> trace "huh" mempty
     getSpline (Spline { splinePoints = pt1:pts}) = thePath
       where
         ptGroups = chunksOf 3 (map pointToP2 pts)
         fixedBeziers = zipWith mkBez (pointToP2 pt1 : map last ptGroups) ptGroups
         mkBez x1 [c1,c2,x2] = FCubic x1 c1 c2 x2
         mkBez _ _ = error "Diagrams.TwoD.GraphViz.getGraph.mkBez: impossible!"
-        thePath         = fromLocSegments . fixup . map fromFixedSeg $ fixedBeziers
+        thePath         = fromLocSegments . fixup . map (view fixed) $ fixedBeziers
         fixup []        = [] `at` origin
         fixup (b1:rest) = (unLoc b1 : map unLoc rest) `at` loc b1
     getSpline _ = error "Diagrams.TwoD.GraphViz.getGraph: don't know what to do with empty spline!"
@@ -177,7 +182,7 @@ getGraph gr = (vmap, edges)
 
 -- | Convert a GraphViz point to a diagrams point.
 pointToP2 :: G.Point -> P2 Double
-pointToP2 (G.Point {xCoord = x, yCoord = y}) = x ^& y
+pointToP2 (G.Point {xCoord = x, yCoord = y}) = P2 x y
 
 -- | Render an annotated graph as a diagram, given functions
 --   controlling the drawing of vertices and of edges.  The first
@@ -190,10 +195,10 @@ pointToP2 (G.Point {xCoord = x, yCoord = y}) = x ^& y
 --   control the placement order, use 'drawGraph''.
 drawGraph
   :: (Ord v, Semigroup m)
-  => (v -> P2 Double -> QDiagram b V2 Double m)
-  -> (v -> P2 Double -> v -> P2 Double -> e -> Path V2 Double -> QDiagram b V2 Double m)
-  -> Gr (AttributeNode v) (AttributeEdge e)
-  -> QDiagram b V2 Double m
+  => (v -> P2 Double -> QDiagram V2 Double m)
+  -> (v -> P2 Double -> v -> P2 Double -> e -> Path V2 Double -> QDiagram V2 Double m)
+  -> Gr ([Attribute], v) ([Attribute], e)
+  -> QDiagram V2 Double m
 drawGraph = drawGraph' EdgesOnTop
 
 -- | A data type for specifying whether edges should be drawn on top
@@ -206,10 +211,10 @@ data GraphLayering = EdgesOnTop | VerticesOnTop
 drawGraph'
   :: (Ord v, Semigroup m)
   => GraphLayering
-  -> (v -> P2 Double -> QDiagram b V2 Double m)
-  -> (v -> P2 Double -> v -> P2 Double -> e -> Path V2 Double -> QDiagram b V2 Double m)
-  -> Gr (AttributeNode v) (AttributeEdge e)
-  -> QDiagram b V2 Double m
+  -> (v -> P2 Double -> QDiagram V2 Double m)
+  -> (v -> P2 Double -> v -> P2 Double -> e -> Path V2 Double -> QDiagram V2 Double m)
+  -> Gr ([Attribute], v) ([Attribute], e)
+  -> QDiagram V2 Double m
 drawGraph' gl drawV drawE gr
   = case gl of
       EdgesOnTop    -> mconcat components
@@ -231,10 +236,9 @@ drawGraph' gl drawV drawE gr
 --   "Data.GraphViz.Command".  For more control over the functioning
 --   of graphviz, see 'layoutGraph''.
 layoutGraph
-  :: forall gr v e. G.Graph gr
-  => GraphvizCommand
-  -> gr v e
-  -> IO (gr (AttributeNode v) (AttributeEdge e))
+  :: GraphvizCommand
+  -> Gr v e
+  -> Gr ([Attribute], v) ([Attribute], e)
 layoutGraph = layoutGraph' (defaultDiaParams :: GraphvizParams G.Node v e () v)
 
 -- | Like 'layoutGraph', but with an extra 'GraphvizParams' parameter
@@ -242,11 +246,11 @@ layoutGraph = layoutGraph' (defaultDiaParams :: GraphvizParams G.Node v e () v)
 --   'defaultDiaParams', and the "Data.GraphViz.Attributes" and
 --   "Data.GraphViz.Attributes.Complete" modules.
 layoutGraph'
-  :: (Ord cl, G.Graph gr)
+  :: Ord cl
   => GraphvizParams G.Node v e cl l
   -> GraphvizCommand
-  -> gr v e
-  -> IO (gr (AttributeNode v) (AttributeEdge e))
+  -> Gr v e
+  -> Gr ([Attribute], v) ([Attribute], e)
 layoutGraph' params com gr = dotAttributes' com (isDirected params) gr' asDot
   where
     asDot = graphToDot params' gr'
@@ -269,33 +273,43 @@ defaultDiaParams
 -- This should not be exported.  It is more or less copied from the
 -- graphviz package source; the problem is that graphviz does not
 -- export any way to have this parameterized by the GraphvizCommand.
-dotAttributes' :: (G.Graph gr, PPDotRepr dg G.Node, FromGeneralisedDot dg G.Node)
-                  => GraphvizCommand -> Bool -> gr v (EdgeID e)
-                  -> dg G.Node -> IO (gr (AttributeNode v) (AttributeEdge e))
+dotAttributes'
+  :: G.Graph gr
+  => GraphvizCommand
+  -> Bool
+  -> gr v (EdgeID e)
+  -> DotGraph G.Node
+  -> gr ([Attribute], v) ([Attribute], e)
 dotAttributes' command _isDir gr asDot
-  = augmentGraph gr . parseDG <$> graphvizWithHandle command asDot DotOutput hGetDot
+  = unsafePerformIO $
+    augmentGraph gr . parseDG <$> graphvizWithHandle command asDot DotOutput hGetDot
   where
     parseDG = (`asTypeOf` asDot) . fromGeneralised
 
 
 -- | Just draw the nodes of the graph as circles and the edges as
 --   arrows between them.
-simpleGraphDiagram :: (Ord v, Renderable (Path V2 Double) b)
-     => GraphvizCommand -> Gr v e -> IO (QDiagram b V2 Double Any)
-simpleGraphDiagram layoutCmd gr = do
-  gr' <- layoutGraph layoutCmd gr
-  let nodes = G.labNodes gr'
-      vmap = M.fromList [ (i, pointToP2 pt)
-                        | (i,(attrs,_)) <- nodes, Pos (PointPos pt) <- attrs ]
-      edgeLengths = [ (fromJust $ M.lookup i vmap) `distance` (fromJust $ M.lookup j vmap)
-                    | (i, j, _) <- G.labEdges gr'
-                    ]
-      nodeRadius = minimum edgeLengths / 4
-      drawing = drawGraph
-                     (const $ place (circle nodeRadius))
-                     (\_ p₁ _ p₂ _ p -> arrowBetween' (opts p) p₁ p₂)
-                     gr'
-      opts p = with & gaps .~ local nodeRadius
-                    & arrowShaft .~ (unLoc . head $ pathTrails p)
-                    & headLength .~ local nodeRadius
-  return drawing
+simpleGraphDiagram
+  :: (Ord v, Ord cl)
+  => GraphvizParams G.Node v e cl l
+  -> GraphvizCommand
+  -> Gr v e
+  -> QDiagram V2 Double Any
+simpleGraphDiagram ps layoutCmd gr = drawing
+  where
+
+    gr' = layoutGraph' ps layoutCmd gr
+    nodes = G.labNodes gr'
+    vmap = M.fromList [ (i, pointToP2 pt)
+                      | (i,(attrs,_)) <- nodes, Pos (PointPos pt) <- traceShowId attrs ]
+    edgeLengths = [ (fromJust $ M.lookup i vmap) `distance` (fromJust $ M.lookup j vmap)
+                  | (i, j, _) <- G.labEdges gr'
+                  ]
+    nodeRadius = minimum edgeLengths / 4
+    drawing = drawGraph
+                   (const $ place (circle nodeRadius))
+                   (\_ p1 _ p2 _ p -> stroke p) -- p1 ~~ p2) -- arrowBetween' (opts p) p1 p2)
+                   gr'
+    -- opts p = with & gaps .~ local nodeRadius
+    --               & arrowShaft .~ (unLoc . head $ pathTrails p)
+    --               & headLength .~ local nodeRadius
